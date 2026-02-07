@@ -1,0 +1,8 @@
+{
+  "name": "ecaiphotosearch",
+  "version": "1.0.0",
+  "description": "ECAI 照片智能归类系统 - 通过 Netlify Functions 解决跨域问题",
+  "scripts": {},
+  "dependencies": {},
+  "devDependencies": {}
+}
