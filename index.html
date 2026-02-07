@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECAI 照片智能归类系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 800px;
+            padding: 40px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .tab-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .upload-area {
+            border: 3px dashed #ddd;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s;
+            margin-bottom: 30px;
+            background: #f9f9f9;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #e8ecff;
+            transform: scale(1.02);
+        }
+
+        .upload-area p {
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+
+        .upload-area .icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 25px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .input-group input,
+        .input-group textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .input-group input:focus,
+        .input-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .tags-input {
+            min-height: 50px;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .result-area {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 15px;
+            display: none;
+        }
+
+        .result-area.show {
+            display: block;
+        }
+
+        .result-item {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .result-item h4 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .result-item p {
+            color: #666;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .tag {
+            background: #e8ecff;
+            color: #667eea;
+            padding: 6px 15px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .photo-card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .photo-card img {
+            max-width: 100%;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            color: #f44336;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📸 ECAI 照片智能归类系统</h1>
+            <p>AI 自动打标 · 智能检索 · 高效管理</p>
+        </div>
+
+        <div class="tab-container">
+            <div class="tab active" data-tab="upload">📤 上传照片</div>
+            <div class="tab" data-tab="search">🔍 检索照片</div>
+        </div>
+
+        <!-- 上传区域 -->
+        <div id="upload-section">
+            <div class="upload-area" id="uploadArea">
+                <div class="icon">☁️</div>
+                <p>拖拽照片到这里，或点击选择文件</p>
+                <input type="file" id="fileInput" class="file-input" accept="image/*">
+                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">选择照片</button>
+            </div>
+
+            <div class="input-group">
+                <label>文件名（可选）</label>
+                <input type="text" id="fileName" placeholder="例如：医院门头.jpg">
+            </div>
+
+            <button class="submit-btn" id="uploadBtn" onclick="uploadPhoto()">✨ 开始分析并上传</button>
+        </div>
+
+        <!-- 检索区域 -->
+        <div id="search-section" style="display: none;">
+            <div class="input-group">
+                <label>检索标签（用逗号分隔）</label>
+                <textarea id="searchTags" class="tags-input" placeholder="例如：环境, 建筑, 医院"></textarea>
+            </div>
+
+            <button class="submit-btn" id="searchBtn" onclick="searchPhotos()">🔍 开始检索</button>
+        </div>
+
+        <!-- 加载动画 -->
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>正在处理中，请稍候...</p>
+        </div>
+
+        <!-- 结果区域 -->
+        <div class="result-area" id="resultArea">
+            <div id="resultContent"></div>
+        </div>
+
+        <!-- 错误提示 -->
+        <div class="error" id="errorArea"></div>
+    </div>
+
+    <script>
+        const API_URL = 'https://z6k3kmq245.coze.site/run';
+        const API_TOKEN = 'eyJhbGciOiJSUzI1NiIsImtpZCI6IjQxNTllYWI4LTQ1NmUtNGEwYS05ODIxLTE2NWVhM2U1MDQzYSJ9.eyJpc3MiOiJodHRwczovL2FwaS5jb3plLmNuIiwiYXVkIjpbInA0Y2dNTUJYN2tEeXd3R2pxN2JXbjBIRUplUkFrU0dBIl0sImV4cCI6ODIxMDI2Njg3Njc5OSwiaWF0IjoxNzcwNDcxMzIwLCJzdWIiOiJzcGlmZmU6Ly9hcGkuY296ZS5jbi93b3JrbG9hZF9pZGVudGl0eS9pZDo3NjA0MDc4MzQ1MjM1NDY0MjMzIiwic3JjIjoiaW5ib3VuZF9hdXRoX2FjY2Vzc190b2tlbl9pZDo3NjA0MTE2NDE3OTIyNzI3OTg3In0.guAPngQ9SVfmhxTOZJpapQKmpTwnKVYE5DalcRqH7nHpE19-dCIKAmP69kyxCQnunKcz68EO1KkmV5kRZ3fz57wD0-QBS0mHyBJB_MWJ4RraBTlNHtogKGur30CMBp_JN0tQ_dmO7LWOv2ywYkOs7wZszBrnmWQsLdPu6W1WPB9GGl8cAiuj4oUFBUJsePhigw_oe0IqkT2B1rdFkP3-xrz79igJiB8Dzbd0suaEb4J8ml5fGTikobbooEWV56d_ylViIZQx0zYT7Z8H9mCQ6fixx-ej_zabAoSgrdMNN4gzQ0Daqra-d4Ow89ZvzuE6KZGKRRZLu5pKjHDe5YYhDw';
+
+        let selectedFile = null;
+
+        // 标签切换
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+
+                const tabType = this.dataset.tab;
+                document.getElementById('upload-section').style.display = tabType === 'upload' ? 'block' : 'none';
+                document.getElementById('search-section').style.display = tabType === 'search' ? 'block' : 'none';
+
+                // 清空结果
+                document.getElementById('resultArea').classList.remove('show');
+                document.getElementById('errorArea').classList.remove('show');
+            });
+        });
+
+        // 拖拽上传
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type.startsWith('image/')) {
+                selectedFile = files[0];
+                uploadArea.innerHTML = `
+                    <div class="icon">✅</div>
+                    <p>已选择: ${selectedFile.name}</p>
+                    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">重新选择</button>
+                `;
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                selectedFile = e.target.files[0];
+                uploadArea.innerHTML = `
+                    <div class="icon">✅</div>
+                    <p>已选择: ${selectedFile.name}</p>
+                    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">重新选择</button>
+                `;
+            }
+        });
+
+        // 显示加载
+        function showLoading() {
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('uploadBtn').disabled = true;
+            document.getElementById('searchBtn').disabled = true;
+        }
+
+        // 隐藏加载
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('show');
+            document.getElementById('uploadBtn').disabled = false;
+            document.getElementById('searchBtn').disabled = false;
+        }
+
+        // 显示错误
+        function showError(message) {
+            const errorArea = document.getElementById('errorArea');
+            errorArea.textContent = message;
+            errorArea.classList.add('show');
+        }
+
+        // 上传照片
+        async function uploadPhoto() {
+            if (!selectedFile) {
+                showError('请先选择照片');
+                return;
+            }
+
+            showLoading();
+            document.getElementById('errorArea').classList.remove('show');
+            document.getElementById('resultArea').classList.remove('show');
+
+            try {
+                // 将文件转换为Base64
+                const base64 = await fileToBase64(selectedFile);
+                
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_TOKEN}`
+                    },
+                    body: JSON.stringify({
+                        photo: {
+                            url: base64,
+                            file_type: 'image'
+                        },
+                        operation: 'upload',
+                        file_name: document.getElementById('fileName').value || selectedFile.name
+                    })
+                });
+
+                const data = await response.json();
+
+                hideLoading();
+
+                if (response.ok) {
+                    displayUploadResult(data);
+                } else {
+                    showError(data.msg || '上传失败，请重试');
+                }
+            } catch (error) {
+                hideLoading();
+                showError('网络错误，请检查网络连接');
+                console.error('Error:', error);
+            }
+        }
+
+        // 检索照片
+        async function searchPhotos() {
+            const tagsStr = document.getElementById('searchTags').value.trim();
+            
+            if (!tagsStr) {
+                showError('请输入检索标签');
+                return;
+            }
+
+            const tags = tagsStr.split(',').map(t => t.trim()).filter(t => t);
+
+            if (tags.length === 0) {
+                showError('请输入有效的检索标签');
+                return;
+            }
+
+            showLoading();
+            document.getElementById('errorArea').classList.remove('show');
+            document.getElementById('resultArea').classList.remove('show');
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_TOKEN}`
+                    },
+                    body: JSON.stringify({
+                        operation: 'search',
+                        search_query_tags: tags,
+                        photo: {
+                            url: '',
+                            file_type: 'image'
+                        }
+                    })
+                });
+
+                const data = await response.json();
+
+                hideLoading();
+
+                if (response.ok) {
+                    displaySearchResult(data);
+                } else {
+                    showError(data.msg || '检索失败，请重试');
+                }
+            } catch (error) {
+                hideLoading();
+                showError('网络错误，请检查网络连接');
+                console.error('Error:', error);
+            }
+        }
+
+        // 显示上传结果
+        function displayUploadResult(data) {
+            const resultContent = document.getElementById('resultContent');
+            const tags = [...data.content_tags, ...data.document_tags];
+            
+            resultContent.innerHTML = `
+                <div class="result-item">
+                    <h4>✅ 上传成功</h4>
+                    <p><strong>照片ID:</strong> ${data.photo_id}</p>
+                    <p><strong>色彩风格:</strong> ${data.color_tone}</p>
+                    <p><strong>识别标签:</strong></p>
+                    <div class="tags">
+                        ${tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('resultArea').classList.add('show');
+        }
+
+        // 显示检索结果
+        function displaySearchResult(data) {
+            const resultContent = document.getElementById('resultContent');
+            
+            if (data.similar_photos.length === 0) {
+                resultContent.innerHTML = `
+                    <div class="result-item">
+                        <h4>🔍 检索结果</h4>
+                        <p>没有找到匹配的照片</p>
+                    </div>
+                `;
+            } else {
+                resultContent.innerHTML = `
+                    <div class="result-item">
+                        <h4>🔍 找到 ${data.similar_photos.length} 张相似照片</h4>
+                    </div>
+                `;
+
+                data.similar_photos.forEach(photo => {
+                    const card = document.createElement('div');
+                    card.className = 'photo-card';
+                    card.innerHTML = `
+                        <img src="${photo.url}" alt="照片">
+                        <p><strong>照片ID:</strong> ${photo.photo_id}</p>
+                        <p><strong>文件名:</strong> ${photo.file_name || '未知'}</p>
+                        <p><strong>色彩风格:</strong> ${photo.color_tone}</p>
+                        <p><strong>标签:</strong></p>
+                        <div class="tags">
+                            ${photo.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                        </div>
+                    `;
+                    resultContent.appendChild(card);
+                });
+            }
+
+            document.getElementById('resultArea').classList.add('show');
+        }
+
+        // 文件转Base64
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+    </script>
+</body>
+</html>
