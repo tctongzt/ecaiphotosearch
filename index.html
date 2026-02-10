@@ -297,15 +297,18 @@
         <div class="tab-container">
             <div class="tab active" data-tab="upload">📤 上传照片</div>
             <div class="tab" data-tab="search">🔍 检索照片</div>
+            <div class="tab" data-tab="manage">📊 照片管理</div>
+            <div class="tab" data-tab="stats">📈 使用统计</div>
+            <div class="tab" data-tab="export">📥 数据导出</div>
         </div>
 
         <!-- 上传区域 -->
         <div id="upload-section">
+            <input type="file" id="fileInput" class="file-input" accept="image/*" style="display: none;">
             <div class="upload-area" id="uploadArea">
                 <div class="icon">☁️</div>
                 <p>拖拽照片到这里，或点击选择文件</p>
-                <input type="file" id="fileInput" class="file-input" accept="image/*">
-                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">选择照片</button>
+                <button class="upload-btn" onclick="triggerFileSelect()">选择照片</button>
             </div>
 
             <div class="input-group">
@@ -324,6 +327,42 @@
             </div>
 
             <button class="submit-btn" id="searchBtn" onclick="searchPhotos()">🔍 开始检索</button>
+        </div>
+
+        <!-- 照片管理区域 -->
+        <div id="manage-section" style="display: none;">
+            <div class="input-group">
+                <label>搜索照片</label>
+                <input type="text" id="manageSearch" placeholder="输入文件名或标签搜索...">
+            </div>
+            <div class="input-group">
+                <label>筛选标签</label>
+                <div id="manageTagFilter" class="tags"></div>
+            </div>
+            <button class="submit-btn" id="loadPhotosBtn" onclick="loadAllPhotos()">📊 加载所有照片</button>
+            
+            <div class="result-area" id="manageResult">
+                <div id="manageContent"></div>
+            </div>
+        </div>
+
+        <!-- 使用统计区域 -->
+        <div id="stats-section" style="display: none;">
+            <button class="submit-btn" id="loadStatsBtn" onclick="loadStatistics()">📈 加载统计数据</button>
+            
+            <div class="result-area" id="statsResult">
+                <div id="statsContent"></div>
+            </div>
+        </div>
+
+        <!-- 数据导出区域 -->
+        <div id="export-section" style="display: none;">
+            <div class="result-item">
+                <h4>📥 数据导出</h4>
+                <p>导出所有照片数据和统计信息</p>
+            </div>
+            <button class="submit-btn" id="exportPhotosBtn" onclick="exportPhotos()">📄 导出照片数据 (JSON)</button>
+            <button class="submit-btn" id="exportStatsBtn" onclick="exportStatistics()">📊 导出统计报告 (JSON)</button>
         </div>
 
         <!-- 加载动画 -->
@@ -356,6 +395,9 @@
                 const tabType = this.dataset.tab;
                 document.getElementById('upload-section').style.display = tabType === 'upload' ? 'block' : 'none';
                 document.getElementById('search-section').style.display = tabType === 'search' ? 'block' : 'none';
+                document.getElementById('manage-section').style.display = tabType === 'manage' ? 'block' : 'none';
+                document.getElementById('stats-section').style.display = tabType === 'stats' ? 'block' : 'none';
+                document.getElementById('export-section').style.display = tabType === 'export' ? 'block' : 'none';
 
                 // 清空结果
                 document.getElementById('resultArea').classList.remove('show');
@@ -363,9 +405,16 @@
             });
         });
 
+        // 文件输入框
+        const fileInput = document.getElementById('fileInput');
+
+        // 触发文件选择
+        function triggerFileSelect() {
+            fileInput.click();
+        }
+
         // 拖拽上传
         const uploadArea = document.getElementById('uploadArea');
-        const fileInput = document.getElementById('fileInput');
 
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -383,24 +432,25 @@
             const files = e.dataTransfer.files;
             if (files.length > 0 && files[0].type.startsWith('image/')) {
                 selectedFile = files[0];
-                uploadArea.innerHTML = `
-                    <div class="icon">✅</div>
-                    <p>已选择: ${selectedFile.name}</p>
-                    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">重新选择</button>
-                `;
+                updateUploadAreaUI();
             }
         });
 
         fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
                 selectedFile = e.target.files[0];
-                uploadArea.innerHTML = `
-                    <div class="icon">✅</div>
-                    <p>已选择: ${selectedFile.name}</p>
-                    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">重新选择</button>
-                `;
+                updateUploadAreaUI();
             }
         });
+
+        // 更新上传区域UI
+        function updateUploadAreaUI() {
+            uploadArea.innerHTML = `
+                <div class="icon">✅</div>
+                <p>已选择: ${selectedFile.name}</p>
+                <button class="upload-btn" onclick="triggerFileSelect()">重新选择</button>
+            `;
+        }
 
         // 显示加载
         function showLoading() {
@@ -589,6 +639,381 @@
                 reader.onload = () => resolve(reader.result);
                 reader.onerror = error => reject(error);
             });
+        }
+
+        // ========== 照片管理功能 ==========
+        
+        // 加载所有照片
+        async function loadAllPhotos() {
+            showLoading();
+            
+            try {
+                // 获取所有照片（通过检索空标签列表获取所有照片）
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        operation: 'search',
+                        search_query_tags: [],
+                        photo: { url: '', file_type: 'image' }
+                    })
+                });
+
+                const data = await response.json();
+                hideLoading();
+
+                if (response.ok && data.similar_photos) {
+                    displayManagePhotos(data.similar_photos);
+                    updateTagFilter(data.similar_photos);
+                } else {
+                    showError('加载照片失败，请重试');
+                }
+            } catch (error) {
+                hideLoading();
+                showError('网络错误，请检查网络连接');
+                console.error('Error:', error);
+            }
+        }
+
+        // 显示管理照片列表
+        function displayManagePhotos(photos) {
+            const manageContent = document.getElementById('manageContent');
+            
+            if (photos.length === 0) {
+                manageContent.innerHTML = `
+                    <div class="result-item">
+                        <h4>📊 照片管理</h4>
+                        <p>暂无照片</p>
+                    </div>
+                `;
+                return;
+            }
+
+            manageContent.innerHTML = `
+                <div class="result-item">
+                    <h4>📊 照片管理 - 共 ${photos.length} 张照片</h4>
+                    <p>您可以通过上方搜索框筛选照片</p>
+                </div>
+            `;
+
+            photos.forEach(photo => {
+                const card = document.createElement('div');
+                card.className = 'photo-card';
+                card.innerHTML = `
+                    <img src="${photo.url}" alt="照片">
+                    <p><strong>照片ID:</strong> ${photo.photo_id}</p>
+                    <p><strong>文件名:</strong> ${photo.file_name || '未知'}</p>
+                    <p><strong>色彩风格:</strong> ${photo.color_tone || '未分类'}</p>
+                    <p><strong>上传时间:</strong> ${formatDate(photo.upload_time)}</p>
+                    <p><strong>标签:</strong></p>
+                    <div class="tags">
+                        ${photo.tags && photo.tags.length > 0 
+                            ? photo.tags.map(tag => `<span class="tag">${tag}</span>`).join('') 
+                            : '<span style="color: #999;">无标签</span>'}
+                    </div>
+                `;
+                manageContent.appendChild(card);
+            });
+
+            document.getElementById('manageResult').classList.add('show');
+        }
+
+        // 更新标签筛选器
+        function updateTagFilter(photos) {
+            const tagSet = new Set();
+            photos.forEach(photo => {
+                if (photo.tags) {
+                    photo.tags.forEach(tag => tagSet.add(tag));
+                }
+            });
+
+            const tagFilter = document.getElementById('manageTagFilter');
+            tagFilter.innerHTML = `
+                <label class="tag" style="cursor: pointer; margin-right: 10px;">
+                    <input type="checkbox" value="all" checked onchange="filterPhotosByTag()"> 全部
+                </label>
+                ${Array.from(tagSet).map(tag => `
+                    <label class="tag" style="cursor: pointer; margin-right: 10px;">
+                        <input type="checkbox" value="${tag}" onchange="filterPhotosByTag()"> ${tag}
+                    </label>
+                `).join('')}
+            `;
+        }
+
+        // 按标签筛选照片
+        function filterPhotosByTag() {
+            const checkboxes = document.querySelectorAll('#manageTagFilter input[type="checkbox"]');
+            const selectedTags = [];
+            
+            checkboxes.forEach(cb => {
+                if (cb.checked && cb.value !== 'all') {
+                    selectedTags.push(cb.value);
+                }
+            });
+
+            // 如果没有选择任何标签，显示所有照片
+            if (selectedTags.length === 0 || 
+                (checkboxes[0].checked && checkboxes[0].value === 'all')) {
+                loadAllPhotos();
+                return;
+            }
+
+            // 使用选中的标签进行检索
+            searchPhotosByTags(selectedTags);
+        }
+
+        // 按标签搜索照片
+        async function searchPhotosByTags(tags) {
+            showLoading();
+            
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        operation: 'search',
+                        search_query_tags: tags,
+                        photo: { url: '', file_type: 'image' }
+                    })
+                });
+
+                const data = await response.json();
+                hideLoading();
+
+                if (response.ok && data.similar_photos) {
+                    displayManagePhotos(data.similar_photos);
+                } else {
+                    showError('搜索失败，请重试');
+                }
+            } catch (error) {
+                hideLoading();
+                showError('网络错误，请检查网络连接');
+                console.error('Error:', error);
+            }
+        }
+
+        // 格式化日期
+        function formatDate(dateString) {
+            if (!dateString) return '未知';
+            const date = new Date(dateString);
+            return date.toLocaleString('zh-CN');
+        }
+
+        // ========== 使用统计功能 ==========
+        
+        // 加载统计数据
+        async function loadStatistics() {
+            showLoading();
+            
+            try {
+                // 先加载所有照片来计算统计数据
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        operation: 'search',
+                        search_query_tags: [],
+                        photo: { url: '', file_type: 'image' }
+                    })
+                });
+
+                const data = await response.json();
+                hideLoading();
+
+                if (response.ok && data.similar_photos) {
+                    displayStatistics(data.similar_photos);
+                } else {
+                    showError('加载统计数据失败，请重试');
+                }
+            } catch (error) {
+                hideLoading();
+                showError('网络错误，请检查网络连接');
+                console.error('Error:', error);
+            }
+        }
+
+        // 显示统计数据
+        function displayStatistics(photos) {
+            const statsContent = document.getElementById('statsContent');
+            
+            // 计算统计信息
+            const totalPhotos = photos.length;
+            const tagStats = {};
+            const colorToneStats = {};
+            
+            photos.forEach(photo => {
+                // 统计标签
+                if (photo.tags) {
+                    photo.tags.forEach(tag => {
+                        tagStats[tag] = (tagStats[tag] || 0) + 1;
+                    });
+                }
+                
+                // 统计色彩风格
+                if (photo.color_tone) {
+                    colorToneStats[photo.color_tone] = (colorToneStats[photo.color_tone] || 0) + 1;
+                }
+            });
+
+            // 按标签数量排序
+            const sortedTags = Object.entries(tagStats).sort((a, b) => b[1] - a[1]);
+            const topTags = sortedTags.slice(0, 10);
+
+            statsContent.innerHTML = `
+                <div class="result-item">
+                    <h4>📈 使用统计</h4>
+                </div>
+                
+                <div class="result-item">
+                    <h4>📊 照片总数</h4>
+                    <p style="font-size: 48px; color: #667eea; font-weight: bold;">${totalPhotos}</p>
+                    <p>张照片</p>
+                </div>
+                
+                <div class="result-item">
+                    <h4>🏷️ 标签分布（Top 10）</h4>
+                    ${topTags.length > 0 ? `
+                        <div class="tags">
+                            ${topTags.map(([tag, count]) => `
+                                <span class="tag">${tag} (${count})</span>
+                            `).join('')}
+                        </div>
+                    ` : '<p>暂无标签数据</p>'}
+                </div>
+                
+                <div class="result-item">
+                    <h4>🎨 色彩风格分布</h4>
+                    ${Object.keys(colorToneStats).length > 0 ? `
+                        <div class="tags">
+                            ${Object.entries(colorToneStats).map(([tone, count]) => `
+                                <span class="tag">${tone} (${count})</span>
+                            `).join('')}
+                        </div>
+                    ` : '<p>暂无色彩风格数据</p>'}
+                </div>
+                
+                <div class="result-item">
+                    <h4>💡 使用建议</h4>
+                    <ul style="margin-top: 10px; margin-left: 20px;">
+                        <li>建议为没有标签的照片添加标签</li>
+                        <li>可以按标签分类管理照片</li>
+                        <li>使用检索功能快速查找相似照片</li>
+                    </ul>
+                </div>
+            `;
+
+            document.getElementById('statsResult').classList.add('show');
+        }
+
+        // ========== 数据导出功能 ==========
+        
+        // 导出照片数据
+        async function exportPhotos() {
+            showLoading();
+            
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        operation: 'search',
+                        search_query_tags: [],
+                        photo: { url: '', file_type: 'image' }
+                    })
+                });
+
+                const data = await response.json();
+                hideLoading();
+
+                if (response.ok && data.similar_photos) {
+                    // 导出为JSON文件
+                    const exportData = {
+                        export_time: new Date().toISOString(),
+                        total_photos: data.similar_photos.length,
+                        photos: data.similar_photos
+                    };
+                    
+                    downloadJSON(exportData, 'photos_export.json');
+                    alert('导出成功！');
+                } else {
+                    showError('导出失败，请重试');
+                }
+            } catch (error) {
+                hideLoading();
+                showError('网络错误，请检查网络连接');
+                console.error('Error:', error);
+            }
+        }
+
+        // 导出统计报告
+        async function exportStatistics() {
+            showLoading();
+            
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        operation: 'search',
+                        search_query_tags: [],
+                        photo: { url: '', file_type: 'image' }
+                    })
+                });
+
+                const data = await response.json();
+                hideLoading();
+
+                if (response.ok && data.similar_photos) {
+                    // 计算统计信息
+                    const tagStats = {};
+                    const colorToneStats = {};
+                    
+                    data.similar_photos.forEach(photo => {
+                        if (photo.tags) {
+                            photo.tags.forEach(tag => {
+                                tagStats[tag] = (tagStats[tag] || 0) + 1;
+                            });
+                        }
+                        if (photo.color_tone) {
+                            colorToneStats[photo.color_tone] = (colorToneStats[photo.color_tone] || 0) + 1;
+                        }
+                    });
+
+                    const exportData = {
+                        export_time: new Date().toISOString(),
+                        statistics: {
+                            total_photos: data.similar_photos.length,
+                            tag_distribution: tagStats,
+                            color_tone_distribution: colorToneStats
+                        },
+                        photos: data.similar_photos
+                    };
+                    
+                    downloadJSON(exportData, 'statistics_export.json');
+                    alert('导出成功！');
+                } else {
+                    showError('导出失败，请重试');
+                }
+            } catch (error) {
+                hideLoading();
+                showError('网络错误，请检查网络连接');
+                console.error('Error:', error);
+            }
+        }
+
+        // 下载JSON文件
+        function downloadJSON(data, filename) {
+            const jsonStr = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
     </script>
 </body>

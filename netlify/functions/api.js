@@ -1,8 +1,25 @@
 exports.handler = async function(event, context) {
+  // 处理 OPTIONS 请求（CORS 预检）
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Methods': 'POST, GET, OPTIONS'
+      },
+      body: ''
+    };
+  }
+
   // 只处理 POST 请求
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
       body: JSON.stringify({ msg: 'Method not allowed' })
     };
   }
@@ -41,6 +58,7 @@ exports.handler = async function(event, context) {
     };
 
   } catch (error) {
+    console.error('Error:', error);
     return {
       statusCode: 500,
       headers: {
@@ -49,7 +67,8 @@ exports.handler = async function(event, context) {
       },
       body: JSON.stringify({ 
         msg: 'Internal server error',
-        error: error.message 
+        error: error.message,
+        stack: error.stack
       })
     };
   }
